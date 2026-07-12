@@ -21,9 +21,7 @@
 				"ReplyLines": [
 					"If you are not registered, please do so.",
 					"Then see the `/vote-map` command.",
-					"https://discord.com/channels/287490983875051520/1186113967844757574/1187970792462503996",
-					"https://discord.com/channels/287490983875051520/1186111390277181551/1186111390277181551",
-					"https://discord.com/channels/287490983875051520/1265003183017824259"
+					"https://discord.com/channels/287490983875051520/1522725802653909226"
 				]
 			},
 			{
@@ -43,7 +41,8 @@
 				],
 				"ReplyLines": [
 					"If the griefer/troll is on your factorio map, click the top-left icon (M45 flask \u0026 inserter logo) for info on how to vote to banish the player.",
-					"If they are in Discord, ask in the #moderation channel."
+					"If they are in Discord, ask in the #moderation channel.",
+					"https://discord.com/channels/287490983875051520/887587091209396284"
 				]
 			},
 			{
@@ -67,9 +66,9 @@
 				],
 				"ReplyLines": [
 					"Become a member:",
-					"https://discord.com/channels/287490983875051520/1186113967844757574/1187970792462503996",
-					"Inactive accounts:",
-					"https://discord.com/channels/287490983875051520/1187205693577642096"
+					"https://discord.com/channels/287490983875051520/1522725802653909226",
+					"Rules:",
+					"https://discord.com/channels/287490983875051520/709497235494141993"
 				]
 			},
 			{
@@ -84,7 +83,7 @@
 				],
 				"ReplyLines": [
 					"How to support M45:",
-					"https://discord.com/channels/287490983875051520/1186117730219335781"
+					"https://www.patreon.com/c/m45sci"
 				]
 			},
 			{
@@ -98,7 +97,7 @@
 				],
 				"ReplyLines": [
 					"Website and discord invite:",
-					"https://discord.com/channels/287490983875051520/1186120692933066842"
+					"https://m45sci.xyz/"
 				]
 			}
 		]
@@ -139,8 +138,8 @@
 				],
 				"ReplyLines": [
 					"Use the `/player-level` command, enter the factorio player name, set level to banned and supply a ban reason. Optionally add a link to the log file via https://m45sci.xyz/u/fact2/new-logs/",
-					"https://discord.com/channels/287490983875051520/1186118892377084025/1186118892377084025",
-					"https://discord.com/channels/287490983875051520/1264997863252037683"
+					"https://discord.com/channels/287490983875051520/1522729638722404514",
+					"https://discord.com/channels/287490983875051520/1522726382457720932"
 				]
 			},
 			{
@@ -152,7 +151,7 @@
 				],
 				"ReplyLines": [
 					"Here is a list of Moderator Factorio commands:",
-					"https://discord.com/channels/287490983875051520/1186118611639746641"
+					"https://discord.com/channels/287490983875051520/1522729638722404514"
 				]
 			}
 		]

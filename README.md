@@ -21,3 +21,16 @@ Usage of M45HelpBot:
   -token string
   
         discord token
+
+Testing:
+
+  go test ./...
+
+Live link checks are opt-in:
+
+  LINKCHECK=1 go test -run 'TestHelp.*Links' -v
+
+Discord channel and message links require a bot token with access to the
+server/channel:
+
+  LINKCHECK=1 LINKCHECK_DISCORD_TOKEN='your-token' go test -run TestHelpDiscordLinksResolve -v
