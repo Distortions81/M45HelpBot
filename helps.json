@@ -138,8 +138,7 @@
 				],
 				"ReplyLines": [
 					"Use the `/player-level` command, enter the factorio player name, set level to banned and supply a ban reason. Optionally add a link to the log file via https://m45sci.xyz/u/fact2/new-logs/",
-					"https://discord.com/channels/287490983875051520/1522729638722404514",
-					"https://discord.com/channels/287490983875051520/1522726382457720932"
+					"https://discord.com/channels/287490983875051520/1522725802653909226"
 				]
 			},
 			{
@@ -151,7 +150,7 @@
 				],
 				"ReplyLines": [
 					"Here is a list of Moderator Factorio commands:",
-					"https://discord.com/channels/287490983875051520/1522729638722404514"
+					"https://discord.com/channels/287490983875051520/1522726382457720932"
 				]
 			}
 		]
