@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sync"
 	"time"
 )
 
@@ -21,13 +22,14 @@ var (
 	guildID      string
 	staffChannel string
 
-	lastReply              time.Time
-	users                  map[string]*userData = map[string]*userData{}
-	discordConnectAttempts int
-	totalMsgCount          int
+	replyMu       sync.Mutex
+	lastReply     time.Time
+	users         = map[string]*userData{}
+	totalMsgCount int
 )
 
 type helpData struct {
+	Title      string   `json:",omitempty"`
 	Wildcards  []string `json:",omitempty"`
 	Words      []string `json:",omitempty"`
 	Exclude    []string `json:",omitempty"`

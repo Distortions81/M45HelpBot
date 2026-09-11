@@ -5,10 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 )
 
 var LogDesc *os.File
+var logMu sync.Mutex
 
 /* Normal CW log */
 func DoLog(text string) {
@@ -17,10 +19,13 @@ func DoLog(text string) {
 
 	date := fmt.Sprintf("%2v:%2v.%2v", ctime.Hour(), ctime.Minute(), ctime.Second())
 	buf := fmt.Sprintf("%v: %15v:%5v: %v\n", date, filepath.Base(filename), line, text)
-	_, err := LogDesc.WriteString(buf)
 	fmt.Print(buf)
-
-	if err != nil {
+	logMu.Lock()
+	defer logMu.Unlock()
+	if LogDesc == nil {
+		return
+	}
+	if _, err := LogDesc.WriteString(buf); err != nil {
 		fmt.Println("DoLog: WriteString failure")
 		LogDesc.Close()
 		LogDesc = nil
@@ -52,5 +57,19 @@ func StartCWLog() {
 	}
 
 	/* Save descriptors, open/closed elsewhere */
+	logMu.Lock()
+	defer logMu.Unlock()
+	if LogDesc != nil {
+		LogDesc.Close()
+	}
 	LogDesc = bdesc
+}
+
+func CloseCWLog() {
+	logMu.Lock()
+	defer logMu.Unlock()
+	if LogDesc != nil {
+		LogDesc.Close()
+		LogDesc = nil
+	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -9,27 +10,21 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/bwmarrin/discordgo"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
-
 	"M45HelpBot/cwlog"
 	"M45HelpBot/sclean"
+	"github.com/bwmarrin/discordgo"
 )
 
 var (
-	bootup       time.Time
 	skipThrottle bool
 
 	helpsFile string
 )
 
 func main() {
-	bootup = time.Now()
-
 	token := flag.String("token", "", "discord token")
 	role := flag.String("staffid", "", "discord role ID for moderator/staff")
-	staffChan := flag.String("staffChannel", "", "specifiy a staff-only channel")
+	staffChan := flag.String("staffChannel", "", "specify a staff-only channel")
 	guildid := flag.String("guildid", "", "discord guild id")
 	testMode := flag.Bool("testmode", false, "skip throttle check")
 	helpPath := flag.String("helpFilePath", "helps.json", "Specify path to helps file.")
@@ -42,75 +37,105 @@ func main() {
 	helpsFile = *helpPath
 	staffChannel = *staffChan
 
-	/* Start cw logs */
-	cwlog.StartCWLog()
-	cwlog.DoLog("Starting goDiscInfoBot.")
-
-	if readHelps() {
-		//writeHelps()
-	} else {
-		time.Sleep(time.Second * 10)
-		return
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	ctx, cancel := context.WithTimeout(ctx, rebootTime)
+	defer cancel()
+	if err := run(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-	go CheckLife()
-	go startbot()
-
-	/* Wait here for process signals */
-	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-	<-sc
-
-	writeHelps()
 }
 
-func startbot() {
-
-	/* Check if Discord token is set */
-	if discToken == "" {
-		cwlog.DoLog("Discord token not set, not starting.")
-		return
+func run(ctx context.Context) error {
+	cwlog.StartCWLog()
+	defer cwlog.CloseCWLog()
+	cwlog.DoLog("Starting goDiscInfoBot.")
+	if strings.TrimSpace(guildID) == "" {
+		return fmt.Errorf("Discord guild ID not set")
 	}
-
-	/* Attempt to start bot */
-	cwlog.DoLog("Starting Discord bot...")
-	bot, erra := discordgo.New("Bot " + discToken)
-
-	/*
-	 * If we fail, keep attempting with increasing delay and maximum tries
-	 * We do this, in case there is a failure.
-	 * Discord will invalidate the token if there are too many connection attempts.
-	 */
-	if erra != nil {
-		cwlog.DoLog(fmt.Sprintf("An error occurred when attempting to create the Discord session. Details: %v", erra))
-		time.Sleep(time.Duration(discordConnectAttempts*5) * time.Second)
-		discordConnectAttempts++
-
-		if discordConnectAttempts < maxAttempts {
-			startbot()
+	if !readHelps() {
+		return fmt.Errorf("could not load help file %q", helpsFile)
+	}
+	if ctx.Err() != nil {
+		return nil
+	}
+	type connectionResult struct {
+		bot *discordgo.Session
+		err error
+	}
+	connected := make(chan connectionResult)
+	go func(token string) {
+		bot, err := startbot(ctx, token)
+		select {
+		case connected <- connectionResult{bot, err}:
+		case <-ctx.Done():
+			if bot != nil {
+				bot.Close()
+			}
 		}
-		return
-	}
-
-	bot.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsAllWithoutPrivileged)
-
-	/* This is called when the connection is verified */
-	bot.AddHandler(BotReady)
-	errb := bot.Open()
-
-	/* This handles error after the inital connection */
-	if errb != nil {
-		cwlog.DoLog(fmt.Sprintf("An error occurred when attempting to create the Discord session. Details: %v", errb))
-		time.Sleep(time.Duration(discordConnectAttempts*5) * time.Second)
-		discordConnectAttempts++
-
-		if discordConnectAttempts < maxAttempts {
-			startbot()
+	}(discToken)
+	// Open can block in the gateway handshake. Signals must still stop the bot.
+	select {
+	case result := <-connected:
+		if result.err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			return result.err
 		}
-		return
+		defer result.bot.Close()
+	case <-ctx.Done():
+		return nil
 	}
+	<-ctx.Done()
+	return nil
+}
 
-	/* This drastically reduces log spam */
+func startbot(ctx context.Context, token string) (*discordgo.Session, error) {
+	if strings.TrimSpace(token) == "" {
+		return nil, fmt.Errorf("Discord token not set")
+	}
+	var lastErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			timer := time.NewTimer(time.Duration(attempt*5) * time.Second)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return nil, ctx.Err()
+			case <-timer.C:
+			}
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		cwlog.DoLog("Starting Discord bot...")
+		bot, err := newBotSession(token)
+		if err == nil {
+			err = bot.Open()
+			if err == nil {
+				return bot, nil
+			}
+			bot.Close()
+		}
+		lastErr = err
+		cwlog.DoLog(fmt.Sprintf("Discord connection attempt %d failed: %v", attempt+1, err))
+	}
+	return nil, fmt.Errorf("Discord connection failed after %d attempts: %w", maxAttempts, lastErr)
+}
+
+func newBotSession(token string) (*discordgo.Session, error) {
+	bot, err := discordgo.New("Bot " + token)
+	if err != nil {
+		return nil, err
+	}
+	bot.Identify.Intents = discordgo.IntentsAllWithoutPrivileged | discordgo.IntentMessageContent
 	bot.LogLevel = discordgo.LogWarning
+	// Register once per session: READY can be delivered again after reconnecting.
+	bot.AddHandler(BotReady)
+	bot.AddHandler(MessageCreate)
+	return bot, nil
 }
 
 func BotReady(s *discordgo.Session, r *discordgo.Ready) {
@@ -122,53 +147,35 @@ func BotReady(s *discordgo.Session, r *discordgo.Ready) {
 		cwlog.DoLog(errc.Error())
 	}
 
-	/* Message and command hooks */
-	s.AddHandler(MessageCreate)
-
 	cwlog.DoLog("Discord bot ready.")
-
-	//Reset attempt count, we are fully connected.
-	discordConnectAttempts = 0
-}
-
-func CheckLife() {
-	for {
-		time.Sleep(time.Hour)
-		if time.Since(bootup) > rebootTime {
-			os.Exit(0)
-		}
-	}
 }
 
 func MessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
-	/* Ignore messages from self */
-	if m.Author.ID == s.State.User.ID {
+	if s == nil || m == nil || m.Message == nil || m.Author == nil ||
+		m.Author.Bot || m.WebhookID != "" || m.GuildID == "" || m.GuildID != guildID {
 		return
 	}
 
-	/* Throw away messages from bots */
-	if m.Author.Bot {
-		return
-	}
-
-	if m.GuildID != guildID {
-		fmt.Println("Incorrect guild: " + m.Member.GuildID)
-		return
+	if s.State != nil {
+		s.State.RLock()
+		isSelf := s.State.User != nil && m.Author.ID == s.State.User.ID
+		s.State.RUnlock()
+		if isSelf {
+			return
+		}
 	}
 
 	filterMessages(s, m)
 }
 
 func filterMessages(s *discordgo.Session, m *discordgo.MessageCreate) {
-	resposeCount := 0
-	respondedTo := map[int]bool{}
 	staffMode := false
 
 	//Switch lists if user is staff
 	searchList := HelpsListData{}
 
-	if staffRole != "" {
+	if staffRole != "" && m.Member != nil {
 		for _, role := range m.Member.Roles {
 			if role == staffRole {
 				staffMode = true
@@ -196,121 +203,114 @@ func filterMessages(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	//Prefilter markdown and control and to lower case
-	msgLower := sclean.RemoveDiscordMarkdown(m.Content)
-	msgLower = sclean.StripControlAndSpecial(msgLower)
-	msgLower = strings.ToLower(msgLower)
-
-	//Filter delims for wildcard matching
-	msgWild := strings.ReplaceAll(msgLower, " the ", " ")
-	msgWild = strings.ReplaceAll(msgWild, " ", "")
-	msgWild = strings.ReplaceAll(msgWild, "-", "")
-	msgWild = sclean.AlphaNumOnly(msgWild)
-
-	outLines := []string{}
-
-	caser := cases.Title(language.AmericanEnglish)
-
-	for h, help := range searchList.Data {
-		if respondedTo[h] {
-			continue
-		}
-		if resposeCount >= maxCombinedResponses {
-			break
-		}
-		for _, searchWild := range help.Wildcards {
-			if respondedTo[h] {
-				continue
-			}
-			if resposeCount >= maxCombinedResponses {
-				break
-			}
-			if strings.Contains(msgWild, searchWild) {
-				doExclude := false
-				for _, exclude := range help.Exclude {
-					if strings.Contains(msgWild, exclude) {
-						doExclude = true
-						break
-					}
-				}
-				if doExclude {
-					doExclude = false
-				} else {
-					if respondedTo[h] {
-						continue
-					}
-					if len(outLines) != 0 {
-						outLines = append(outLines, "")
-					}
-					outLines = append(outLines, caser.String(searchWild+": "))
-					outLines = append(outLines, help.ReplyLines...)
-					resposeCount++
-					respondedTo[h] = true
-				}
-			}
-		}
-
-		msgWords := strings.Split(msgLower, " ")
-		for _, msgWord := range msgWords {
-			if respondedTo[h] {
-				continue
-			}
-			if resposeCount >= maxCombinedResponses {
-				break
-			}
-			msgWord = sclean.AlphaNumOnly(msgWord)
-			for _, helpWord := range help.Words {
-				if strings.EqualFold(msgWord, helpWord) {
-					doExclude := false
-					for _, exclude := range help.Exclude {
-						if strings.Contains(msgWild, exclude) {
-							doExclude = true
-							break
-						}
-					}
-					if doExclude {
-						doExclude = false
-					} else {
-						if len(outLines) != 0 {
-							outLines = append(outLines, "")
-						}
-						outLines = append(outLines, caser.String(helpWord+": "))
-						outLines = append(outLines, help.ReplyLines...)
-						resposeCount++
-						respondedTo[h] = true
-					}
-				}
-			}
-		}
-	}
-
+	outLines := helpReplyLines(m.Content, searchList.Data)
 	if len(outLines) > 0 {
-		if checkThrottle(m) {
-			buf := strings.Join(outLines, "\n")
-			cwlog.DoLog(fmt.Sprintf("TRIGGERED:\n%v: %v: %v\nReply: %v", m.ChannelID, m.Author.Username, m.Content, buf))
-
-			reply := &discordgo.MessageSend{
-				Content: buf,
-				Reference: &discordgo.MessageReference{
-					MessageID: m.ID,
-					ChannelID: m.ChannelID,
-					GuildID:   m.GuildID,
-				},
-			}
-			_, err := s.ChannelMessageSendComplex(m.ChannelID, reply)
-			if err != nil {
-				cwlog.DoLog(err.Error())
-			}
-		}
+		sendHelpReply(s, m, strings.Join(outLines, "\n"))
 	}
 }
 
+func helpReplyLines(content string, helps []helpData) []string {
+	msgLower := strings.ToLower(sclean.RemoveDiscordMarkdown(content))
+	msgLower = sclean.StripControlAndSubSpecial(msgLower)
+	msgLower = strings.Join(strings.Fields(msgLower), " ")
+	msgWild := sclean.AlphaNumOnly(strings.ReplaceAll(msgLower, " the ", " "))
+	msgWords := strings.Fields(msgLower)
+	for i, word := range msgWords {
+		msgWords[i] = sclean.AlphaNumOnly(word)
+	}
+	var outLines []string
+	responseCount := 0
+	for _, help := range helps {
+		if responseCount >= maxCombinedResponses {
+			break
+		}
+		keyword := help.match(msgLower, msgWild, msgWords)
+		if keyword == "" {
+			continue
+		}
+		if len(outLines) != 0 {
+			outLines = append(outLines, "")
+		}
+		outLines = append(outLines, help.title(keyword)+":")
+		outLines = append(outLines, help.ReplyLines...)
+		responseCount++
+	}
+	return outLines
+}
+
+func (help helpData) match(msgLower, msgWild string, msgWords []string) string {
+	for _, exclude := range help.Exclude {
+		exclude = strings.ToLower(exclude)
+		// URLs need their punctuation; existing compact exclusions still work.
+		if exclude != "" && (strings.Contains(msgLower, exclude) || strings.Contains(msgWild, exclude)) {
+			return ""
+		}
+	}
+	for _, wildcard := range help.Wildcards {
+		if wildcard != "" && strings.Contains(msgWild, strings.ToLower(wildcard)) {
+			return wildcard
+		}
+	}
+	for _, word := range msgWords {
+		if word == "" {
+			continue
+		}
+		for _, keyword := range help.Words {
+			if strings.EqualFold(word, keyword) {
+				return keyword
+			}
+		}
+	}
+	return ""
+}
+
+func sendHelpReply(s *discordgo.Session, m *discordgo.MessageCreate, content string) {
+	// Keep the check, send, and accounting together so concurrent handlers cannot
+	// bypass the limits. A failed send must not consume a user's daily reply.
+	replyMu.Lock()
+	defer replyMu.Unlock()
+	if !checkThrottle(m) {
+		return
+	}
+	reply := &discordgo.MessageSend{
+		Content: content,
+		Reference: &discordgo.MessageReference{
+			MessageID: m.ID,
+			ChannelID: m.ChannelID,
+			GuildID:   m.GuildID,
+		},
+	}
+	if _, err := s.ChannelMessageSendComplex(m.ChannelID, reply); err != nil {
+		cwlog.DoLog(fmt.Sprintf("Could not send help reply: %v", err))
+		return
+	}
+	if !skipThrottle {
+		now := time.Now()
+		if users[m.Author.ID] == nil {
+			users[m.Author.ID] = &userData{id: m.Author.ID}
+		}
+		users[m.Author.ID].lastSaw = now
+		users[m.Author.ID].total++
+		lastReply = now
+		totalMsgCount++
+	}
+	cwlog.DoLog(fmt.Sprintf("TRIGGERED:\n%v: %v: %v\nReply: %v", m.ChannelID, m.Author.Username, m.Content, content))
+}
+
+func (help helpData) title(fallback string) string {
+	if help.Title != "" {
+		return help.Title
+	}
+	return fallback
+}
+
+// checkThrottle requires replyMu to be held. It does not consume an allowance.
 func checkThrottle(m *discordgo.MessageCreate) bool {
 	if skipThrottle {
 		return true
 	}
 
-	if totalMsgCount > maxGlobal {
+	if totalMsgCount >= maxGlobal {
 		return false
 	}
 
@@ -318,20 +318,15 @@ func checkThrottle(m *discordgo.MessageCreate) bool {
 		cwlog.DoLog(fmt.Sprintf("global throttled: User: %v, Message: %v", m.Author.ID, m.Content))
 		return false
 	}
-	if users[m.Author.ID] == nil {
-		users[m.Author.ID] = &userData{id: m.Author.ID, lastSaw: time.Now()}
-	} else {
-		if users[m.Author.ID].total > maxPerUser {
+	if user := users[m.Author.ID]; user != nil {
+		if user.total >= maxPerUser {
 			return false
 		}
-		if time.Since(users[m.Author.ID].lastSaw) < throttlePerUser {
+		if time.Since(user.lastSaw) < throttlePerUser {
 			cwlog.DoLog(fmt.Sprintf("user throttled: User: %v, Message: %v", m.Author.ID, m.Content))
 			return false
 		}
 	}
-
-	users[m.Author.ID].lastSaw = time.Now()
-	users[m.Author.ID].total++
 
 	return true
 }

@@ -1,7 +1,6 @@
 package sclean
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 )
@@ -60,9 +59,9 @@ func StripControl(str string) string {
 	b := make([]byte, len(str))
 	var bl int
 	for i := 0; i < len(str); i++ {
-		c := fmt.Sprintf("%c", i)
-		if c[0] >= 32 && c[0] != 127 {
-			b[bl] = c[0]
+		c := str[i]
+		if c >= 32 && c != 127 {
+			b[bl] = c
 			bl++
 		}
 	}
@@ -70,17 +69,5 @@ func StripControl(str string) string {
 }
 
 func RemoveDiscordMarkdown(input string) string {
-	/* Remove Discord markdown */
-	regf := regexp.MustCompile(`\*+`)
-	regg := regexp.MustCompile(`\~+`)
-	regh := regexp.MustCompile(`\_+`)
-	for regf.MatchString(input) || regg.MatchString(input) || regh.MatchString(input) {
-		/* Filter Discord tags */
-		input = regf.ReplaceAllString(input, "")
-		input = regg.ReplaceAllString(input, "")
-		input = regh.ReplaceAllString(input, "")
-		input = strings.ReplaceAll(input, "`", "")
-	}
-
-	return input
+	return strings.NewReplacer("*", "", "~", "", "_", "", "`", "").Replace(input)
 }

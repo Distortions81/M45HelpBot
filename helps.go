@@ -2,7 +2,6 @@ package main
 
 import (
 	"M45HelpBot/cwlog"
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -23,13 +22,15 @@ func readHelps() bool {
 		return false
 	}
 
-	err = json.Unmarshal(file, &helpsList)
+	var loaded []HelpsListData
+	err = json.Unmarshal(file, &loaded)
 
 	if err != nil {
-		cwlog.DoLog("Error: readHelps: Unable to unmashal helps file.")
+		cwlog.DoLog(fmt.Sprintf("Error: readHelps: Unable to unmarshal helps file: %v", err))
 		return false
 	}
 
+	helpsList = loaded
 	helpsCount := 0
 	for _, helpsType := range helpsList {
 		helpsCount += len(helpsType.Data)
@@ -39,21 +40,4 @@ func readHelps() bool {
 	cwlog.DoLog(buf)
 
 	return true
-}
-
-func writeHelps() {
-	outbuf := new(bytes.Buffer)
-	enc := json.NewEncoder(outbuf)
-	enc.SetIndent("", "\t")
-
-	if err := enc.Encode(helpsList); err != nil {
-		cwlog.DoLog("writeHelps: enc.Encode failure")
-		return
-	}
-
-	err := os.WriteFile(helpsFile, outbuf.Bytes(), 0755)
-
-	if err != nil {
-		cwlog.DoLog("Error: writeHelps: Unable to write the helps file.")
-	}
 }

@@ -3,6 +3,7 @@
 		"Name": "main",
 		"Data": [
 			{
+				"Title": "Map reset",
 				"Wildcards": [
 					"skipreset",
 					"stopreset",
@@ -10,7 +11,10 @@
 					"mapreset",
 					"votemap",
 					"startover",
-					"rollback"
+					"rollback",
+					"restartmap",
+					"maprestart",
+					"nextreset"
 				],
 				"Words": [
 					"revert",
@@ -19,12 +23,13 @@
 					"rewound"
 				],
 				"ReplyLines": [
-					"If you are not registered, please do so.",
-					"Then see the `/vote-map` command.",
+					"For the next scheduled reset, run `/info` in the Discord channel for your map.",
+					"To vote for a rewind, new map, or skipped reset, run `/vote-map` there, press Enter, and choose from the menu. Voting requires the Regular role or higher; use `/register` to link your in-game rank to Discord.",
 					"https://discord.com/channels/287490983875051520/1522725802653909226"
 				]
 			},
 			{
+				"Title": "Moderation help",
 				"Words": [
 					"grief",
 					"griefing",
@@ -37,20 +42,32 @@
 					"banned",
 					"spam",
 					"spammer",
-					"childish"
+					"childish",
+					"harassment",
+					"harass",
+					"abuse",
+					"abusive",
+					"cheater",
+					"cheating"
 				],
 				"ReplyLines": [
-					"If the griefer/troll is on your factorio map, click the top-left icon (M45 flask \u0026 inserter logo) for info on how to vote to banish the player.",
-					"If they are in Discord, ask in the #moderation channel.",
+					"If the griefer or troll is on your Factorio map, use the top-left M45 flask-and-inserter icon for information about voting to banish them.",
+					"If the issue is in Discord, ask in #moderation-help.",
 					"https://discord.com/channels/287490983875051520/887587091209396284"
 				]
 			},
 			{
+				"Title": "Membership",
 				"Wildcards": [
 					"whitelist",
 					"inviteonly",
 					"membersonly",
-					"regualrsonly"
+					"regularsonly",
+					"regualrsonly",
+					"whitelistme",
+					"howdoijoin",
+					"canijoin",
+					"joinserver"
 				],
 				"Words": [
 					"register",
@@ -58,35 +75,48 @@
 					"regular",
 					"veteran",
 					"expired",
-					"login"
+					"login",
+					"registration",
+					"registered",
+					"unregistered"
 				],
 				"Exclude": [
 					"http://",
 					"https://"
 				],
 				"ReplyLines": [
-					"Become a member:",
-					"https://discord.com/channels/287490983875051520/1522725802653909226",
-					"Rules:",
-					"https://discord.com/channels/287490983875051520/709497235494141993"
+					"Earn membership by playing on public maps. To get your Discord roles, run `/register` in Discord, join the Factorio server named in its reply, and enter the supplied `/register <code>` command inside Factorio.",
+					"If access expired after being away, join a public server first and allow a few minutes for members-only access to update.",
+					"[Membership help](https://m45sci.xyz/help-info.html#membership) | [Rules](https://discord.com/channels/287490983875051520/709497235494141993)"
 				]
 			},
 			{
+				"Title": "Support M45",
 				"Words": [
 					"patreon",
 					"donate",
-					"supporter"
+					"supporter",
+					"sponsor",
+					"sponsorship",
+					"funding"
 				],
 				"Exclude": [
 					"http://",
 					"https://"
 				],
 				"ReplyLines": [
-					"How to support M45:",
+					"Support M45:",
 					"https://www.patreon.com/c/m45sci"
 				]
 			},
 			{
+				"Title": "Website and invite",
+				"Wildcards": [
+					"discordinvite",
+					"serverinvite",
+					"invitecode",
+					"joinlink"
+				],
 				"Words": [
 					"website",
 					"invite"
@@ -96,7 +126,7 @@
 					"https://"
 				],
 				"ReplyLines": [
-					"Website and discord invite:",
+					"M45 website and Discord invite:",
 					"https://m45sci.xyz/"
 				]
 			}
@@ -106,6 +136,7 @@
 		"Name": "staff",
 		"Data": [
 			{
+				"Title": "Map controls",
 				"Wildcards": [
 					"skipreset",
 					"stopreset",
@@ -113,7 +144,10 @@
 					"mapreset",
 					"votemap",
 					"startover",
-					"rollback"
+					"rollback",
+					"restartmap",
+					"maprestart",
+					"nextreset"
 				],
 				"Words": [
 					"revert",
@@ -122,11 +156,13 @@
 					"rewound"
 				],
 				"ReplyLines": [
-					"Use the `/changemap` command, press enter and choose desired option from the dialog box.",
-					"You can skip the next auto reset 'skip-reset' or reset the map with 'new-map'"
+					"In the Discord channel for the map, run `/change-map`, press Enter, and choose a save, `NEW-MAP`, or `SKIP-RESET` when available.",
+					"For older saves, use `/change-map list:true`, then `/change-map load:<save name>`. `/info` shows the next scheduled reset.",
+					"https://m45sci.xyz/help-discord-staff.html#maps"
 				]
 			},
 			{
+				"Title": "Player moderation",
 				"Words": [
 					"griefing",
 					"griefer",
@@ -134,23 +170,34 @@
 					"trolling",
 					"ban",
 					"banish",
-					"banned"
+					"banned",
+					"harassment",
+					"harass",
+					"abuse",
+					"abusive",
+					"cheater",
+					"cheating",
+					"kick"
 				],
 				"ReplyLines": [
-					"Use the `/player-level` command, enter the factorio player name, set level to banned and supply a ban reason. Optionally add a link to the log file via https://m45sci.xyz/u/fact2/new-logs/",
-					"https://discord.com/channels/287490983875051520/1522725802653909226"
+					"For a temporary timeout, use `/jail <playerName>` in Factorio; `/unjail <playerName>` releases them.",
+					"For a ban, use `/player-level` in Discord, choose the Factorio player name and level Banned, and supply `ban-reason`. Evidence: https://m45sci.xyz/u/fact2/new-logs/",
+					"https://m45sci.xyz/help-discord-staff.html#ban"
 				]
 			},
 			{
+				"Title": "Moderator commands",
 				"Words": [
 					"spawn",
 					"reveal",
 					"teleport",
-					"gspeed"
+					"gspeed",
+					"immortal"
 				],
 				"ReplyLines": [
-					"Here is a list of Moderator Factorio commands:",
-					"https://discord.com/channels/287490983875051520/1522726382457720932"
+					"In Factorio: `/goto <playerName>` or `/tp <location>` to teleport; `/reveal` to reveal an area; `/cspawn` to move spawn to you.",
+					"`/gspeed 1.0` restores normal game speed. `/immortal` toggles immortality.",
+					"https://m45sci.xyz/help-factorio-staff.html"
 				]
 			}
 		]
